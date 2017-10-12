@@ -64,12 +64,10 @@ void *do_search(void *arg) {
 
   if (rep == NULL) {
     RedisModule_ReplyWithError(ctx, "ERR reply is NULL");
-    FreeArgv(ctx, argv, argc);
-    return NULL;
+    goto free_argv;
   } else if (RedisModule_CallReplyType(rep) == REDISMODULE_REPLY_ERROR) {
     RedisModule_ReplyWithCallReply(ctx, rep);
-    FreeArgv(ctx, argv, argc);
-    return NULL;
+    goto free_reply;
   }
 
   size_t replyCount = RedisModule_CallReplyLength(rep);
@@ -139,9 +137,11 @@ void *do_search(void *arg) {
     RedisModule_ReplyWithNull(ctx);
   }
 
-  FreeArgv(ctx, argv, argc);
   Vector_Free(res);
+free_reply:
   RedisModule_FreeCallReply(rep);
+free_argv:
+  FreeArgv(ctx, argv, argc);
   RedisModule_FreeThreadSafeContext(ctx);
   RedisModule_UnblockClient(bc, NULL);
   return NULL;
