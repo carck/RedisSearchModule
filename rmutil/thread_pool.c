@@ -38,7 +38,7 @@ int tpool_create(int max_thr_num) {
   tpool = calloc(1, sizeof(tpool_t));
   if (!tpool) {
     printf("%s: calloc failed\n", __FUNCTION__);
-    exit(1);
+    return -1;
   }
 
   tpool->max_thr_num = max_thr_num;
@@ -47,24 +47,24 @@ int tpool_create(int max_thr_num) {
   if (pthread_mutex_init(&tpool->queue_lock, NULL) != 0) {
     printf("%s: pthread_mutex_init failed, errno:%d, error:%s\n", __FUNCTION__, errno,
            strerror(errno));
-    exit(1);
+    return -1;
   }
   if (pthread_cond_init(&tpool->queue_ready, NULL) != 0) {
     printf("%s: pthread_cond_init failed, errno:%d, error:%s\n", __FUNCTION__, errno,
            strerror(errno));
-    exit(1);
+    return -1;
   }
 
   tpool->thr_id = calloc(max_thr_num, sizeof(pthread_t));
   if (!tpool->thr_id) {
     printf("%s: calloc failed\n", __FUNCTION__);
-    exit(1);
+    return -1;
   }
   for (i = 0; i < max_thr_num; ++i) {
     if (pthread_create(&tpool->thr_id[i], NULL, thread_routine, NULL) != 0) {
       printf("%s:pthread_create failed, errno:%d, error:%s\n", __FUNCTION__, errno,
              strerror(errno));
-      exit(1);
+      return -1;
     }
   }
 

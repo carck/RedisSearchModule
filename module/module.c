@@ -24,8 +24,8 @@ typedef struct {
 int compare(void *arg, const void *a, const void *b) {
   Ext *ext1 = *(Ext **)a;
   Ext *ext2 = *((Ext **)b);
-  cJSON *pin1 = cJSON_GetObjectItem(ext1->json, "pin");
-  cJSON *pin2 = cJSON_GetObjectItem(ext2->json, "pin");
+  cJSON *pin1 = cJSON_GetObjectItem(ext1->json, arg);
+  cJSON *pin2 = cJSON_GetObjectItem(ext2->json, arg);
   return strcmp(pin1->valuestring, pin2->valuestring);
 }
 
@@ -155,8 +155,9 @@ int HSearchCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
   return REDISMODULE_OK;
 }
 
-int RedisModule_OnLoad(RedisModuleCtx *ctx) {
-  if (tpool_create(8) != 0) {
+int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+  int poolSize = 8;
+  if (tpool_create((int)poolSize) != 0) {
     return REDISMODULE_ERR;
   }
   // Register the module itself
