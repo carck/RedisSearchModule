@@ -29,6 +29,13 @@ int compare(void *arg, const void *a, const void *b) {
   return strcmp(pin1->valuestring, pin2->valuestring);
 }
 
+void FreeArgv(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
+  for (int i = 0; i < argc; i++) {
+    RedisModule_FreeString(ctx, argv[i]);
+  }
+  RedisModule_Free(argv);
+}
+
 void *do_search(void *arg) {
   CommandCtx *cctx = arg;
   RedisModuleBlockedClient *bc = cctx->bc;
@@ -39,12 +46,14 @@ void *do_search(void *arg) {
   RedisModuleCtx *ctx = RedisModule_GetThreadSafeContext(bc);
 
   // open the key and make sure it's indeed a HASH and not empty
-  RedisModuleKey *key = RedisModule_OpenKey(ctx, argv[1], REDISMODULE_READ | REDISMODULE_WRITE);
+  /*
+  RedisModuleKey *key = RedisModule_OpenKey(ctx, argv[1], REDISMODULE_READ);
   if (RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_HASH &&
       RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_EMPTY) {
+    RM_CloseKey(key);
     RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
     return NULL;
-  }
+  }*/
 
   // get the current value of the hash element
   RedisModule_ThreadSafeContextLock(ctx);
@@ -53,9 +62,11 @@ void *do_search(void *arg) {
 
   if (rep == NULL) {
     RedisModule_ReplyWithError(ctx, "ERR reply is NULL");
+    FreeArgv(ctx, argv, argc);
     return NULL;
   } else if (RedisModule_CallReplyType(rep) == REDISMODULE_REPLY_ERROR) {
     RedisModule_ReplyWithCallReply(ctx, rep);
+    FreeArgv(ctx, argv, argc);
     return NULL;
   }
 
@@ -123,6 +134,7 @@ void *do_search(void *arg) {
     RedisModule_ReplyWithNull(ctx);
   }
 
+  FreeArgv(ctx, argv, argc);
   Vector_Free(res);
   RedisModule_FreeCallReply(rep);
   RedisModule_FreeThreadSafeContext(ctx);
@@ -142,9 +154,15 @@ int HSearchCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
 
   RedisModuleBlockedClient *bc = RedisModule_BlockClient(ctx, NULL, NULL, NULL, 0);
 
+  //copy argv to use in thread
+  RedisModuleString **argvSafe = RedisModule_Alloc(sizeof(RedisModuleString *) * argc);
+  for (int i = 0; i < argc; i++) {
+    argvSafe[i] = RedisModule_CreateStringFromString(ctx, argv[i]);
+  }
+
   CommandCtx *cctx = RedisModule_Alloc(sizeof(CommandCtx));
   cctx->bc = bc;
-  cctx->argv = argv;
+  cctx->argv = argvSafe;
   cctx->argc = argc;
 
   if (tpool_add_work(do_search, (void *)cctx) != 0) {
