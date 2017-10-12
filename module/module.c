@@ -90,7 +90,8 @@ void *do_search(void *arg) {
     found = 0;
     for (int j = 0; j < 3; j++) {
       json_value = cJSON_GetObjectItem(json_root, fields[j]);
-      if (strstr(json_value->valuestring, filter)) {
+      //strstr case sensitive
+      if (strcasestr(json_value->valuestring, filter)) {
         found = 1;
         break;
       }
@@ -174,7 +175,7 @@ int HSearchCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
 }
 
 int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
-  int poolSize = 8;
+  int poolSize = 6;
   if (tpool_create((int)poolSize) != 0) {
     return REDISMODULE_ERR;
   }
