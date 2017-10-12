@@ -10,10 +10,10 @@
 * Works like C++ std::vector with an underlying resizable buffer
 */
 typedef struct {
-    char *data;
-    size_t elemSize;
-    size_t cap;
-    size_t top;
+  char *data;
+  size_t elemSize;
+  size_t cap;
+  size_t top;
 
 } Vector;
 
@@ -68,7 +68,7 @@ size_t Vector_Cap(Vector *v);
  * they are pointers*/
 void Vector_Free(Vector *v);
 
-void Vector_Sort(Vector *v, int(*compare)(const void*,const void*));
+void Vector_Sort(Vector *v, void *arg, int (*compare)(void *, const void *, const void *));
 
 int __vecotr_PutPtr(Vector *v, size_t pos, void *elem);
 

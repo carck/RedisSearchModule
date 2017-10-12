@@ -8,10 +8,8 @@
 /// exit the current function
 #define RMUTIL_ASSERT_NOERROR(ctx, r)                                   \
   if (r == NULL) {                                                      \
-    abort();                                                            \
     return RedisModule_ReplyWithError(ctx, "ERR reply is NULL");        \
   } else if (RedisModule_CallReplyType(r) == REDISMODULE_REPLY_ERROR) { \
-    abort();                                                            \
     RedisModule_ReplyWithCallReply(ctx, r);                             \
     return REDISMODULE_ERR;                                             \
   }

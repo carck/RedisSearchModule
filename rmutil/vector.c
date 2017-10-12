@@ -80,12 +80,16 @@ void Vector_Free(Vector *v) {
   free(v);
 }
 
-void Vector_Sort(Vector *v, int(*compare)(const void*,const void*)){
-    qsort((void *)v->data, Vector_Size(v), v->elemSize, compare);
+void Vector_Sort(Vector *v, void *arg, int (*compare)(void *, const void *, const void *)) {
+  qsort_r((void *)v->data, Vector_Size(v), v->elemSize, arg, compare);
 }
 
 /* return the used size of the vector, regardless of capacity */
-inline size_t Vector_Size(Vector *v) { return v->top; }
+inline size_t Vector_Size(Vector *v) {
+  return v->top;
+}
 
 /* return the actual capacity */
-inline size_t Vector_Cap(Vector *v) { return v->cap; }
+inline size_t Vector_Cap(Vector *v) {
+  return v->cap;
+}
