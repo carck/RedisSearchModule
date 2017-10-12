@@ -18,15 +18,17 @@ typedef struct {
 
 typedef struct {
   cJSON *json;
+  cJSON *sort;
   RedisModuleString *reply;
 } Ext;
 
 int compare(void *arg, const void *a, const void *b) {
   Ext *ext1 = *(Ext **)a;
   Ext *ext2 = *((Ext **)b);
-  cJSON *pin1 = cJSON_GetObjectItem(ext1->json, arg);
-  cJSON *pin2 = cJSON_GetObjectItem(ext2->json, arg);
-  return strcmp(pin1->valuestring, pin2->valuestring);
+  int sort= *(int*)arg;
+  cJSON *pin1 = ext1->sort;
+  cJSON *pin2 = ext2->sort;
+  return sort * strcmp(pin1->valuestring, pin2->valuestring);
 }
 
 void FreeArgv(RedisModuleCtx *ctx, RedisModuleString **argv, int argc){
@@ -73,6 +75,7 @@ void *do_search(void *arg) {
   size_t replyCount = RedisModule_CallReplyLength(rep);
 
   const char *filter = RedisModule_StringPtrLen(argv[2], NULL);
+  const char *sortName = RedisModule_StringPtrLen(argv[3], NULL);
   Vector *res = NewVector(Ext *, 200);
 
   Ext *ext;
@@ -99,6 +102,7 @@ void *do_search(void *arg) {
     if (found == 1) {
       ext = RedisModule_Alloc(sizeof(Ext));
       ext->json = json_root;
+      ext->sort = cJSON_GetObjectItem(json_root, sortName);;
       ext->reply = json_body;
       Vector_Push(res, ext);
       ext = NULL;
@@ -115,8 +119,8 @@ void *do_search(void *arg) {
   size_t page_end = (size_t)tmp;
 
   if (Vector_Size(res) > page_start) {
-    const char *sortName = RedisModule_StringPtrLen(argv[3], NULL);
-    Vector_Sort(res, sortName, compare);
+    int sort = 1;
+    Vector_Sort(res, &sort, compare);
   }
 
   if (Vector_Size(res) > 0) {
