@@ -82,7 +82,7 @@ void *DoSearch(void *arg) {
   RedisModuleCallReply *cr_ext;
   RedisModuleString *json_body;
   int found;
-  char *fields[] = {"name", "department", "pin"};
+  char *fields[] = {"name", "department", "pin", "number"};
   for (int i = 0; i < ct_reply; i++) {
     cr_ext = RedisModule_CallReplyArrayElement(reply, i);
     json_body = RedisModule_CreateStringFromCallReply(cr_ext);
