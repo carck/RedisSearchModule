@@ -17,9 +17,20 @@ typedef struct {
 } CommandCtx;
 
 typedef struct {
-  cJSON *json;
+  RedisModuleString *key;
+  const char *query;
+  const char *filters[10];
+  int ct_filter;
+  int page_start;
+  int page_end;
+  const char *sortName;
+  int sortDirection;
+} SearchForm;
+
+typedef struct {
+  cJSON *doc;
   cJSON *sort;
-  RedisModuleString *reply;
+  RedisModuleString *rawString;
 } Entity;
 
 int compare(void *arg, const void *a, const void *b) {
@@ -38,8 +49,51 @@ void FreeArgv(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
   RedisModule_Free(argv);
 }
 
+void InitSearchFrom(SearchForm *form, RedisModuleString **argv, int argc) {
+  form->key = argv[1];
+  form->query = RedisModule_StringPtrLen(argv[2], NULL);
+  const char *sortName = RedisModule_StringPtrLen(argv[3], NULL);
+  form->sortDirection = (*sortName == '-' ? 1 : -1);
+  form->sortName = sortName + 1;
+  long long tmp;
+  RedisModule_StringToLongLong(argv[4], &tmp);
+  form->page_start = (size_t)tmp;
+  RedisModule_StringToLongLong(argv[5], &tmp);
+  form->page_end = (size_t)tmp;
+  form->ct_filter = argc - 6;
+  if (form->ct_filter > 0) {
+    for (int i = 0; i < form->ct_filter; i++) {
+      form->filters[i] = RedisModule_StringPtrLen(argv[6 + i], NULL);
+    }
+  }
+}
+
+int IsMatch(cJSON *doc, SearchForm *form) {
+  cJSON *json_value;
+  const static char *fields[] = {"name", "department", "pin", "number"};
+  if (form->ct_filter > 0) {
+    for (int i = 0; i < form->ct_filter; i += 2) {
+      json_value = cJSON_GetObjectItem(doc, form->filters[i]);
+      if (strcmp(json_value->valuestring, form->filters[i + 1]) != 0) {
+        return 0;
+      }
+    }
+  }
+  for (int j = 0; j < 4; j++) {
+    json_value = cJSON_GetObjectItem(doc, fields[j]);
+    // strstr case sensitive
+    if (strcasestr(json_value->valuestring, form->query)) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 void *DoSearch(void *arg) {
   CommandCtx *cctx = arg;
+
+  SearchForm form;
+  InitSearchFrom(&form, cctx->argv, cctx->argc);
   RedisModuleBlockedClient *bc = cctx->bc;
   RedisModuleString **argv = cctx->argv;
   int argc = cctx->argc;
@@ -47,19 +101,9 @@ void *DoSearch(void *arg) {
 
   RedisModuleCtx *ctx = RedisModule_GetThreadSafeContext(bc);
 
-  // open the key and make sure it's indeed a HASH and not empty
-  /*
-  RedisModuleKey *key = RedisModule_OpenKey(ctx, argv[1], REDISMODULE_READ);
-  if (RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_HASH &&
-      RedisModule_KeyType(key) != REDISMODULE_KEYTYPE_EMPTY) {
-    RM_CloseKey(key);
-    RedisModule_ReplyWithError(ctx, REDISMODULE_ERRORMSG_WRONGTYPE);
-    return NULL;
-  }*/
-
-  // get the current value of the hash element
+  // get element to search
   RedisModule_ThreadSafeContextLock(ctx);
-  RedisModuleCallReply *reply = RedisModule_Call(ctx, "HVALS", "s", argv[1]);
+  RedisModuleCallReply *reply = RedisModule_Call(ctx, "HVALS", "s", form.key);
   RedisModule_ThreadSafeContextUnlock(ctx);
 
   if (reply == NULL) {
@@ -71,68 +115,45 @@ void *DoSearch(void *arg) {
   }
 
   size_t ct_reply = RedisModule_CallReplyLength(reply);
-
-  const char *filter = RedisModule_StringPtrLen(argv[2], NULL);
-  const char *sortName = RedisModule_StringPtrLen(argv[3], NULL);
-  Vector *res = NewVector(Entity *, 200);
+  Vector *res = NewVector(Entity *, min(200, ct_reply));
 
   Entity *ext;
-  cJSON *json_root;
-  cJSON *json_value;
+  cJSON *doc;
   RedisModuleCallReply *cr_ext;
   RedisModuleString *json_body;
-  int found;
-  char *fields[] = {"name", "department", "pin", "number"};
   for (int i = 0; i < ct_reply; i++) {
     cr_ext = RedisModule_CallReplyArrayElement(reply, i);
     json_body = RedisModule_CreateStringFromCallReply(cr_ext);
-    json_root = cJSON_Parse(RedisModule_StringPtrLen(json_body, NULL));
+    doc = cJSON_Parse(RedisModule_StringPtrLen(json_body, NULL));
 
-    found = 0;
-    for (int j = 0; j < 3; j++) {
-      json_value = cJSON_GetObjectItem(json_root, fields[j]);
-      // strstr case sensitive
-      if (strcasestr(json_value->valuestring, filter)) {
-        found = 1;
-        break;
-      }
-    }
-    if (found == 1) {
+    if (IsMatch(doc, &form) == 1) {
       ext = RedisModule_Alloc(sizeof(Entity));
-      ext->json = json_root;
-      ext->sort = cJSON_GetObjectItem(json_root, sortName);
-      ext->reply = json_body;
+      ext->doc = doc;
+      ext->sort = cJSON_GetObjectItem(doc, form.sortName);
+      ext->rawString = json_body;
       Vector_Push(res, ext);
       ext = NULL;
     } else {
       RedisModule_FreeString(ctx, json_body);
-      cJSON_Delete(json_root);
+      cJSON_Delete(doc);
     }
   }
 
-  long long tmp;
-  RedisModule_StringToLongLong(argv[4], &tmp);
-  size_t page_start = (size_t)tmp;
-  RedisModule_StringToLongLong(argv[5], &tmp);
-  size_t page_end = (size_t)tmp;
-
-  if (Vector_Size(res) > page_start) {
-    int sort = 1;
-    Vector_Sort(res, &sort, compare);
+  if (Vector_Size(res) > form.page_start) {
+    Vector_Sort(res, &form.sortDirection, compare);
   }
 
   if (Vector_Size(res) > 0) {
-    Entity *ext2;
-    RedisModule_ReplyWithArray(ctx, min(Vector_Size(res), page_end) - page_start + 1);
+    RedisModule_ReplyWithArray(ctx, min(Vector_Size(res), form.page_end) - form.page_start + 1);
     RedisModule_ReplyWithDouble(ctx, Vector_Size(res));
     for (size_t idx = 0; idx < Vector_Size(res); idx++) {
-      Vector_Get(res, idx, &ext2);
-      cJSON_Delete(ext2->json);
-      if (idx >= page_start && idx < page_end) {
-        RedisModule_ReplyWithString(ctx, ext2->reply);
+      Vector_Get(res, idx, &ext);
+      cJSON_Delete(ext->doc);
+      if (idx >= form.page_start && idx < form.page_end) {
+        RedisModule_ReplyWithString(ctx, ext->rawString);
       }
-      RedisModule_FreeString(ctx, ext2->reply);
-      RedisModule_Free(ext2);
+      RedisModule_FreeString(ctx, ext->rawString);
+      RedisModule_Free(ext);
     }
   } else {
     RedisModule_ReplyWithNull(ctx);
@@ -154,7 +175,7 @@ free_argv:
 int HSearchCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
 
   // check arguments
-  if (argc < 6 || argc % 2 != 0) {
+  if (argc < 6 || argc % 2 != 0 || argc > 16) {
     return RedisModule_WrongArity(ctx);
   }
 
