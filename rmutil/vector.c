@@ -58,16 +58,16 @@ int Vector_Resize(Vector *v, size_t newcap) {
 
   // If we grew:
   // put all zeros at the newly realloc'd part of the vector
-  if (newcap > oldcap) {
-    int offset = oldcap * v->elemSize;
-    memset(v->data + offset, 0, v->cap * v->elemSize - offset);
-  }
+  //if (newcap > oldcap) {
+  //  int offset = oldcap * v->elemSize;
+  //  memset(v->data + offset, 0, v->cap * v->elemSize - offset);
+  //}
   return v->cap;
 }
 
 Vector *__newVectorSize(size_t elemSize, size_t cap) {
   Vector *vec = malloc(sizeof(Vector));
-  vec->data = calloc(cap, elemSize);
+  vec->data = malloc(cap * elemSize);
   vec->top = 0;
   vec->elemSize = elemSize;
   vec->cap = cap;
