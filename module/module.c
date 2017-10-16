@@ -130,6 +130,9 @@ void *DoSearch(void *arg) {
     json_body = RedisModule_CreateStringFromCallReply(cr_ext);
     doc = cJSON_Parse(RedisModule_StringPtrLen(json_body, NULL));
 
+    if(doc == NULL)
+        continue;
+
     if (IsMatch(doc, &form) == 1) {
       ext = RedisModule_Alloc(sizeof(Entity));
       ext->doc = doc;
