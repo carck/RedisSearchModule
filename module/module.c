@@ -19,6 +19,7 @@ typedef struct {
 typedef struct {
   RedisModuleString *key;
   const char *query;
+  int len_query;
   const char *filters[10];
   int ct_filter;
   int page_start;
@@ -52,6 +53,7 @@ void FreeArgv(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
 void InitSearchFrom(SearchForm *form, RedisModuleString **argv, int argc) {
   form->key = argv[1];
   form->query = RedisModule_StringPtrLen(argv[2], NULL);
+  form->len_query = strlen(form->query);
   const char *sortName = RedisModule_StringPtrLen(argv[3], NULL);
   form->sortDirection = (*sortName == '-' ? 1 : -1);
   form->sortName = sortName + 1;
@@ -79,6 +81,8 @@ int IsMatch(cJSON *doc, SearchForm *form) {
       }
     }
   }
+  if(form->len_query == 0)
+    return 1;
   for (int j = 0; j < 4; j++) {
     json_value = cJSON_GetObjectItem(doc, fields[j]);
     // strstr case sensitive
