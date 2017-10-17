@@ -1,14 +1,18 @@
 #define REDISMODULE_EXPERIMENTAL_API
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include "../redismodule.h"
 #include "../rmutil/util.h"
 #include "../rmutil/vector.h"
 #include "../rmutil/strings.h"
 #include "../rmutil/cJSON.h"
 #include "../rmutil/thread_pool.h"
+#include "../rmutil/string_pool.h"
 
 #define min(a, b) (((a) < (b)) ? (a) : (b))
+
+StringPool *sm;
 
 typedef struct {
   RedisModuleBlockedClient *bc;
@@ -76,6 +80,8 @@ int IsMatch(cJSON *doc, SearchForm *form) {
   if (form->ct_filter > 0) {
     for (int i = 0; i < form->ct_filter; i += 2) {
       json_value = cJSON_GetObjectItem(doc, form->filters[i]);
+      if(json_value==NULL)
+        return 0;
       if (strcmp(json_value->valuestring, form->filters[i + 1]) != 0) {
         return 0;
       }
@@ -85,6 +91,8 @@ int IsMatch(cJSON *doc, SearchForm *form) {
     return 1;
   for (int j = 0; j < 4; j++) {
     json_value = cJSON_GetObjectItem(doc, fields[j]);
+    if(json_value==NULL)
+        continue;
     // strstr case sensitive
     if (strcasestr(json_value->valuestring, form->query)) {
       return 1;
@@ -212,6 +220,12 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
   if (tpool_create((int)poolSize) != 0) {
     return REDISMODULE_ERR;
   }
+
+  sm = sm_new(256);
+  if(sm == NULL){
+    return REDISMODULE_ERR;
+  }
+
   // Register the module itself
   if (RedisModule_Init(ctx, "nr", 1, REDISMODULE_APIVER_1) == REDISMODULE_ERR) {
     return REDISMODULE_ERR;

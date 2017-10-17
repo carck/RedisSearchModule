@@ -51,7 +51,7 @@ inline int __vector_PutPtr(Vector *v, size_t pos, void *elem) {
 }
 
 int Vector_Resize(Vector *v, size_t newcap) {
-  int oldcap = v->cap;
+  //int oldcap = v->cap;
   v->cap = newcap;
 
   v->data = realloc(v->data, v->cap * v->elemSize);

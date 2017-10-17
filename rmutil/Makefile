@@ -7,7 +7,7 @@ CFLAGS ?= -g -fPIC -O3 -std=gnu99 -Wall -Wno-unused-function
 CFLAGS += -I$(RM_INCLUDE_DIR)
 CC=gcc
 
-OBJS=util.o strings.o sds.o vector.o alloc.o cJSON.o thread_pool.o
+OBJS=util.o strings.o sds.o vector.o alloc.o cJSON.o thread_pool.o string_pool.o
 
 all: librmutil.a
 
