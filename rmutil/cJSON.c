@@ -43,6 +43,40 @@ static int cJSON_strcasecmp(const char *s1,const char *s2)
 	return tolower(*(const unsigned char *)s1) - tolower(*(const unsigned char *)s2);
 }
 
+static unsigned int murMurHash(const void *key, int len) {
+    const unsigned int m = 0x5bd1e995;
+    const int r = 24;
+    const int seed = 97;
+    unsigned int h = seed ^ len;
+    // Mix 4 bytes at a time into the hash
+    const unsigned char *data = (const unsigned char *)key;
+    while(len >= 4)
+    {
+        unsigned int k = *(unsigned int *)data;
+        k *= m;
+        k ^= k >> r;
+        k *= m;
+        h *= m;
+        h ^= k;
+        data += 4;
+        len -= 4;
+    }
+    // Handle the last few bytes of the input array
+    switch(len)
+    {
+        case 3: h ^= data[2] << 16;
+        case 2: h ^= data[1] << 8;
+        case 1: h ^= data[0];
+        h *= m;
+    };
+    // Do a few final mixes of the hash to ensure the last few
+    // bytes are well-incorporated.
+    h ^= h >> 13;
+    h *= m;
+    h ^= h >> 15;
+    return h;
+}
+
 static void *(*cJSON_malloc)(size_t sz) = malloc;
 static void (*cJSON_free)(void *ptr) = free;
 
@@ -524,7 +558,9 @@ static const char *parse_object(cJSON *item,const char *value)
 	if (!item->child) return 0;
 	value=skip(parse_string(child,skip(value)));
 	if (!value) return 0;
-	child->string=child->valuestring;child->valuestring=0;
+	child->string=child->valuestring;
+	child->hash = murMurHash(child->string, strlen(child->string));
+	child->valuestring=0;
 	if (*value!=':') {ep=value;return 0;}	/* fail! */
 	value=skip(parse_value(child,skip(value+1)));	/* skip any spacing, get the value. */
 	if (!value) return 0;
@@ -660,7 +696,7 @@ static char *print_object(cJSON *item,int depth,int fmt,printbuffer *p)
 /* Get Array size/item / object item. */
 int    cJSON_GetArraySize(cJSON *array)							{cJSON *c=array->child;int i=0;while(c)i++,c=c->next;return i;}
 cJSON *cJSON_GetArrayItem(cJSON *array,int item)				{cJSON *c=array->child;  while (c && item>0) item--,c=c->next; return c;}
-cJSON *cJSON_GetObjectItem(cJSON *object,const char *string)	{cJSON *c=object->child; while (c && strcmp(c->string,string)) c=c->next; return c;}
+cJSON *cJSON_GetObjectItem(cJSON *object,const char *string)	{cJSON *c=object->child; unsigned int hash=murMurHash(string, strlen(string)); while (c && c->hash==hash && strcmp(c->string,string)) c=c->next; return c;}
 cJSON *cJSON_GetObjectItemCase(cJSON *object,const char *string)	{cJSON *c=object->child; while (c && cJSON_strcasecmp(c->string,string)) c=c->next; return c;}
 
 /* Utility for array list handling. */
