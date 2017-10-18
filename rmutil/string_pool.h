@@ -87,6 +87,8 @@ void sm_delete(StringPool *pool);
  */
 char *sm_put(StringPool *pool, const char *string);
 
+char *sm_nput(StringPool *pool, const char *string, size_t len);
+
 /*
  * Returns the number of string in the pool.
  *

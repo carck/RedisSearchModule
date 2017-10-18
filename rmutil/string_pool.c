@@ -109,7 +109,16 @@ void sm_delete(StringPool *pool) {
 }
 
 char *sm_put(StringPool *pool, const char *string) {
-  unsigned int key_len, index;
+  if (pool == NULL) {
+    return NULL;
+  }
+  if (string == NULL) {
+    return NULL;
+  }
+  return sm_nput(pool, string, strlen(string));
+}
+char *sm_nput(StringPool *pool, const char *string, size_t key_len) {
+  unsigned int index;
   Bucket *bucket;
   Pair *tmp_pairs, *pair;
   char *new_key = NULL;
@@ -120,7 +129,6 @@ char *sm_put(StringPool *pool, const char *string) {
   if (string == NULL) {
     return NULL;
   }
-  key_len = strlen(string);
   /* Get a pointer to the bucket the key string hashes to */
   index = murMurHash(string, key_len) % pool->count;
   bucket = &(pool->buckets[index]);
@@ -168,7 +176,7 @@ char *sm_put(StringPool *pool, const char *string) {
   pair = &(bucket->pairs[bucket->count - 1]);
   pair->key = new_key;
   /* Copy the key and its value into the key-value pair */
-  strcpy(pair->key, string);
+  strncpy(pair->key, string, key_len);
 unlock:
   pthread_mutex_unlock(&pool->mutex);
   return new_key;

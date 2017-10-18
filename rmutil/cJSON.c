@@ -250,7 +250,7 @@ static unsigned parse_hex4(const char *str) {
 
 /* Parse the input text into an unescaped cstring, and populate item. */
 static const unsigned char firstByteMark[7] = {0x00, 0x00, 0xC0, 0xE0, 0xF0, 0xF8, 0xFC};
-static const char *parse_string(cJSON *item, const char *str) {
+static const char *parse_string(cJSON *item, const char *str, int forKey) {
   const char *ptr = str + 1;
   char *ptr2;
   char *out;
@@ -260,6 +260,15 @@ static const char *parse_string(cJSON *item, const char *str) {
     ep = str;
     return 0;
   } /* not a string! */
+
+  // we don't support escape on keys
+  if (forKey) {
+    while (*ptr != '\"' && *ptr && ++len) ptr++;
+    if (*ptr == '\"') ptr++;
+    item->valuestring = sm_nput(sm, str+1, len);
+    item->type = cJSON_String;
+    return ptr;
+  }
 
   while (*ptr != '\"' && *ptr && ++len)
     if (*ptr++ == '\\') ptr++; /* Skip escaped quotes. */
@@ -517,7 +526,7 @@ static const char *parse_value(cJSON *item, const char *value) {
     return value + 4;
   }
   if (*value == '\"') {
-    return parse_string(item, value);
+    return parse_string(item, value, 0);
   }
   if (*value == '-' || (*value >= '0' && *value <= '9')) {
     return parse_number(item, value);
@@ -741,11 +750,9 @@ static const char *parse_object(cJSON *item, const char *value) {
 
   item->child = child = cJSON_New_Item();
   if (!item->child) return 0;
-  value = skip(parse_string(child, skip(value)));
+  value = skip(parse_string(child, skip(value), 1));
   if (!value) return 0;
-  child->string = sm_put(sm, child->valuestring);
-  cJSON_free(child->valuestring);
-  // child->hash = murMurHash(child->string, strlen(child->string));
+  child->string = child->valuestring;
   child->valuestring = 0;
   if (*value != ':') {
     ep = value;
@@ -760,10 +767,9 @@ static const char *parse_object(cJSON *item, const char *value) {
     child->next = new_item;
     new_item->prev = child;
     child = new_item;
-    value = skip(parse_string(child, skip(value + 1)));
+    value = skip(parse_string(child, skip(value + 1), 1));
     if (!value) return 0;
-    child->string = sm_put(sm, child->valuestring);
-    cJSON_free(child->valuestring);
+    child->string = child->valuestring;
     child->valuestring = 0;
     if (*value != ':') {
       ep = value;
