@@ -147,14 +147,13 @@ void *DoSearch(void *arg) {
       ext->sort = cJSON_GetObjectItem(doc, form.sortName);
       ext->rawString = json_body;
       Vector_Push(res, ext);
-      ext = NULL;
     } else {
       RedisModule_FreeString(ctx, json_body);
       cJSON_Delete(doc);
     }
   }
 
-  if (Vector_Size(res) > form.page_start) {
+  if (Vector_Size(res) > form.page_start + 1 && ext-> sort != NULL) {
     Vector_Sort(res, &form.sortDirection, compare);
   }
 
