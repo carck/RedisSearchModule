@@ -59,8 +59,8 @@ typedef struct {
   int ct_filter;
   int page_start;
   int page_end;
-  const char *sortName;
   int sortDirection;
+  const char *sortName;
 } SearchForm;
 
 typedef struct {
@@ -125,7 +125,7 @@ int IsMatch(cJSON *doc, SearchForm *form) {
     if(json_value==NULL)
         continue;
     // strstr case sensitive
-    if (strnncasestr(json_value->valuestring, form->query, abs(json_value->valueint), strlen(form->query))) {
+    if (strnncasestr(json_value->valuestring, form->query, abs(json_value->valueint), form->len_query)) {
       return 1;
     }
   }
