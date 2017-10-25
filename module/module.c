@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <ctype.h>
 #include "../redismodule.h"
 #include "../rmutil/util.h"
 #include "../rmutil/vector.h"
@@ -28,10 +29,11 @@ char* strnncasestr(const char *str, const char *target, int n1, int n2) {
     return NULL;
 
   const char *p1 = str, *p2 = target;
+  char *p1b;
   int l = n1 - n2 + 1;
   int c = n2;
   while (l--) {
-    char *p1b = p1;
+    p1b = p1;
     while (tolower(*p1) == tolower(*p2) && c--) {
       p1++;
       p2++;
@@ -54,13 +56,13 @@ typedef struct {
 typedef struct {
   RedisModuleString *key;
   const char *query;
-  int len_query;
   const char *filters[10];
+  int len_query;
   int ct_filter;
   int page_start;
   int page_end;
-  int sortDirection;
   const char *sortName;
+  int sortDirection;
 } SearchForm;
 
 typedef struct {
