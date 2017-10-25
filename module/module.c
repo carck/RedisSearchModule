@@ -14,6 +14,37 @@
 
 StringPool *sm;
 
+int strnncmp(const char* s1, const char* s2, int n1, int n2)
+{
+    int l = min(n1, n2);
+    while(l--)
+        if(*s1++!=*s2++)
+            return *(unsigned char*)(s1 - 1) - *(unsigned char*)(s2 - 1);
+    return n1 - n2;
+}
+
+char* strnncasestr(const char *str, const char *target, int n1, int n2) {
+  if (n1 < n2)
+    return NULL;
+
+  const char *p1 = str, *p2 = target;
+  int l = n1 - n2 + 1;
+  int c = n2;
+  while (l--) {
+    char *p1b = p1;
+    while (tolower(*p1) == tolower(*p2) && c--) {
+      p1++;
+      p2++;
+    }
+    if (c == 0)
+      return p1b;
+    c = n2;
+    p1 = p1b + 1;
+    p2 = target;
+  }
+  return NULL;
+}
+
 typedef struct {
   RedisModuleBlockedClient *bc;
   RedisModuleString **argv;
@@ -44,7 +75,7 @@ int compare(void *arg, const void *a, const void *b) {
   int sort = *(int *)arg;
   cJSON *pin1 = ext1->sort;
   cJSON *pin2 = ext2->sort;
-  return sort * strcmp(pin1->valuestring, pin2->valuestring);
+  return sort * strnncmp(pin1->valuestring, pin2->valuestring, abs(pin1->valueint), abs(pin2->valueint));
 }
 
 void FreeArgv(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
@@ -82,7 +113,7 @@ int IsMatch(cJSON *doc, SearchForm *form) {
       json_value = cJSON_GetObjectItem(doc, form->filters[i]);
       if(json_value==NULL)
         return 0;
-      if (strcmp(json_value->valuestring, form->filters[i + 1]) != 0) {
+      if (strnncmp(json_value->valuestring, form->filters[i + 1], abs(json_value->valueint), strlen(form->filters[i + 1])) != 0) {
         return 0;
       }
     }
@@ -94,7 +125,7 @@ int IsMatch(cJSON *doc, SearchForm *form) {
     if(json_value==NULL)
         continue;
     // strstr case sensitive
-    if (strcasestr(json_value->valuestring, form->query)) {
+    if (strnncasestr(json_value->valuestring, form->query, abs(json_value->valueint), strlen(form->query))) {
       return 1;
     }
   }

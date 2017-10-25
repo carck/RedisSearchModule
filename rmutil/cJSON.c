@@ -85,7 +85,7 @@ void cJSON_Delete(cJSON *c) {
   while (c) {
     next = c->next;
     if (!(c->type & cJSON_IsReference) && c->child) cJSON_Delete(c->child);
-    if (!(c->type & cJSON_IsReference) && c->valuestring) cJSON_free(c->valuestring);
+    if (!(c->type & cJSON_IsReference) && c->valueint < 0 && c->valuestring) cJSON_free(c->valuestring);
     // if (!(c->type&cJSON_StringIsConst) && c->string) cJSON_free(c->string);
     cJSON_free(c);
     c = next;
@@ -254,7 +254,7 @@ static const char *parse_string(cJSON *item, const char *str, int forKey) {
   const char *ptr = str + 1;
   char *ptr2;
   char *out;
-  int len = 0;
+  int len = 0, hasEscape=0;
   unsigned uc, uc2;
   if (*str != '\"') {
     ep = str;
@@ -271,7 +271,20 @@ static const char *parse_string(cJSON *item, const char *str, int forKey) {
   }
 
   while (*ptr != '\"' && *ptr && ++len)
-    if (*ptr++ == '\\') ptr++; /* Skip escaped quotes. */
+    if (*ptr++ == '\\') {
+        ptr++; /* Skip escaped quotes. */
+        hasEscape = 1;
+    }
+
+  if(hasEscape == 0){
+    if (*ptr == '\"') {ptr++;}
+    item->valueint=len;
+    item->valuestring = str+1;
+    item->type = cJSON_String;
+    return ptr;
+  }
+
+  item->valueint=-len;
 
   out = (char *)cJSON_malloc(len + 1); /* This is how long we need for the string, roughly. */
   if (!out) return 0;
